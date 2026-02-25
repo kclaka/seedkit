@@ -69,4 +69,4 @@ jobs:
         env:
           TEST_POSTGRES_URL: postgres://seedkit:seedkit@localhost:5432/seedkit_test
           TEST_MYSQL_URL: mysql://seedkit:seedkit@localhost:3306/seedkit_test
-        run: cargo test --test '*'
+        run: cargo test --test '*' -- --test-threads=1
