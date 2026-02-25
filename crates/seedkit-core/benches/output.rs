@@ -80,16 +80,12 @@ fn bench_sql_output(c: &mut Criterion) {
     for row_count in [100, 1000, 10_000] {
         let data = make_generated_data(row_count);
         group.throughput(Throughput::Elements(row_count as u64));
-        group.bench_with_input(
-            BenchmarkId::new("rows", row_count),
-            &data,
-            |b, data| {
-                b.iter(|| {
-                    let mut w = NullWriter;
-                    sql::write_sql(&mut w, data, &schema).unwrap();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("rows", row_count), &data, |b, data| {
+            b.iter(|| {
+                let mut w = NullWriter;
+                sql::write_sql(&mut w, data, &schema).unwrap();
+            });
+        });
     }
     group.finish();
 }
@@ -100,16 +96,12 @@ fn bench_json_output(c: &mut Criterion) {
     for row_count in [100, 1000, 10_000] {
         let data = make_generated_data(row_count);
         group.throughput(Throughput::Elements(row_count as u64));
-        group.bench_with_input(
-            BenchmarkId::new("rows", row_count),
-            &data,
-            |b, data| {
-                b.iter(|| {
-                    let mut w = NullWriter;
-                    json::write_json(&mut w, data).unwrap();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("rows", row_count), &data, |b, data| {
+            b.iter(|| {
+                let mut w = NullWriter;
+                json::write_json(&mut w, data).unwrap();
+            });
+        });
     }
     group.finish();
 }
@@ -120,19 +112,20 @@ fn bench_csv_output(c: &mut Criterion) {
     for row_count in [100, 1000, 10_000] {
         let data = make_generated_data(row_count);
         group.throughput(Throughput::Elements(row_count as u64));
-        group.bench_with_input(
-            BenchmarkId::new("rows", row_count),
-            &data,
-            |b, data| {
-                b.iter(|| {
-                    let mut w = NullWriter;
-                    csv::write_csv(&mut w, data).unwrap();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("rows", row_count), &data, |b, data| {
+            b.iter(|| {
+                let mut w = NullWriter;
+                csv::write_csv(&mut w, data).unwrap();
+            });
+        });
     }
     group.finish();
 }
 
-criterion_group!(benches, bench_sql_output, bench_json_output, bench_csv_output);
+criterion_group!(
+    benches,
+    bench_sql_output,
+    bench_json_output,
+    bench_csv_output
+);
 criterion_main!(benches);

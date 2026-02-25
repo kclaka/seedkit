@@ -13,7 +13,9 @@ use seedkit_core::sample::stats::ColumnDistribution;
 use seedkit_core::schema::types::*;
 
 /// Build a schema with one table containing N semantic columns (no FKs).
-fn single_table_schema(num_columns: usize) -> (DatabaseSchema, HashMap<(String, String), SemanticType>) {
+fn single_table_schema(
+    num_columns: usize,
+) -> (DatabaseSchema, HashMap<(String, String), SemanticType>) {
     let mut schema = DatabaseSchema::new(DatabaseType::PostgreSQL, "bench".to_string());
     let mut table = Table::new("items".to_string());
     let mut classifications = HashMap::new();
@@ -61,10 +63,20 @@ fn fk_schema() -> (DatabaseSchema, HashMap<(String, String), SemanticType>) {
         columns: vec!["id".to_string()],
         name: None,
     });
-    let email_col = Column::new("email".to_string(), DataType::VarChar, "varchar".to_string());
+    let email_col = Column::new(
+        "email".to_string(),
+        DataType::VarChar,
+        "varchar".to_string(),
+    );
     users.columns.insert("email".to_string(), email_col);
-    classifications.insert(("users".to_string(), "id".to_string()), SemanticType::AutoIncrement);
-    classifications.insert(("users".to_string(), "email".to_string()), SemanticType::Email);
+    classifications.insert(
+        ("users".to_string(), "id".to_string()),
+        SemanticType::AutoIncrement,
+    );
+    classifications.insert(
+        ("users".to_string(), "email".to_string()),
+        SemanticType::Email,
+    );
 
     // Child: orders
     let mut orders = Table::new("orders".to_string());
@@ -75,7 +87,11 @@ fn fk_schema() -> (DatabaseSchema, HashMap<(String, String), SemanticType>) {
         columns: vec!["id".to_string()],
         name: None,
     });
-    let user_id_col = Column::new("user_id".to_string(), DataType::Integer, "integer".to_string());
+    let user_id_col = Column::new(
+        "user_id".to_string(),
+        DataType::Integer,
+        "integer".to_string(),
+    );
     orders.columns.insert("user_id".to_string(), user_id_col);
     orders.foreign_keys.push(ForeignKey {
         name: Some("orders_user_id_fkey".to_string()),
@@ -86,12 +102,25 @@ fn fk_schema() -> (DatabaseSchema, HashMap<(String, String), SemanticType>) {
         on_update: ForeignKeyAction::NoAction,
         is_deferrable: false,
     });
-    let amount_col = Column::new("amount".to_string(), DataType::Numeric, "numeric".to_string());
+    let amount_col = Column::new(
+        "amount".to_string(),
+        DataType::Numeric,
+        "numeric".to_string(),
+    );
     orders.columns.insert("amount".to_string(), amount_col);
 
-    classifications.insert(("orders".to_string(), "id".to_string()), SemanticType::AutoIncrement);
-    classifications.insert(("orders".to_string(), "user_id".to_string()), SemanticType::ExternalId);
-    classifications.insert(("orders".to_string(), "amount".to_string()), SemanticType::Price);
+    classifications.insert(
+        ("orders".to_string(), "id".to_string()),
+        SemanticType::AutoIncrement,
+    );
+    classifications.insert(
+        ("orders".to_string(), "user_id".to_string()),
+        SemanticType::ExternalId,
+    );
+    classifications.insert(
+        ("orders".to_string(), "amount".to_string()),
+        SemanticType::Price,
+    );
 
     schema.tables.insert("users".to_string(), users);
     schema.tables.insert("orders".to_string(), orders);
@@ -144,27 +173,23 @@ fn bench_column_count(c: &mut Criterion) {
         let insertion_order = vec!["items".to_string()];
 
         group.throughput(Throughput::Elements(row_count as u64));
-        group.bench_with_input(
-            BenchmarkId::new("cols", col_count),
-            &col_count,
-            |b, _| {
-                let plan = GenerationPlan::build(
-                    &schema,
-                    &classifications,
-                    &insertion_order,
-                    Vec::new(),
-                    row_count,
-                    &empty_overrides,
-                    42,
-                    None,
-                    &empty_col_overrides,
-                    None,
-                );
-                b.iter(|| {
-                    execute_plan(&plan, &schema, None).unwrap();
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("cols", col_count), &col_count, |b, _| {
+            let plan = GenerationPlan::build(
+                &schema,
+                &classifications,
+                &insertion_order,
+                Vec::new(),
+                row_count,
+                &empty_overrides,
+                42,
+                None,
+                &empty_col_overrides,
+                None,
+            );
+            b.iter(|| {
+                execute_plan(&plan, &schema, None).unwrap();
+            });
+        });
     }
     group.finish();
 }
@@ -213,7 +238,11 @@ fn bench_value_list_strategy(c: &mut Criterion) {
 
     let mut schema = DatabaseSchema::new(DatabaseType::PostgreSQL, "bench".to_string());
     let mut table = Table::new("items".to_string());
-    let col = Column::new("color".to_string(), DataType::VarChar, "varchar".to_string());
+    let col = Column::new(
+        "color".to_string(),
+        DataType::VarChar,
+        "varchar".to_string(),
+    );
     table.columns.insert("color".to_string(), col);
     schema.tables.insert("items".to_string(), table);
 
@@ -226,8 +255,11 @@ fn bench_value_list_strategy(c: &mut Criterion) {
                 semantic_type: SemanticType::Unknown,
                 strategy: GenerationStrategy::ValueList {
                     values: vec![
-                        "red".into(), "blue".into(), "green".into(),
-                        "black".into(), "white".into(),
+                        "red".into(),
+                        "blue".into(),
+                        "green".into(),
+                        "black".into(),
+                        "white".into(),
                     ],
                     weights: Some(vec![0.25, 0.20, 0.20, 0.20, 0.15]),
                 },
@@ -258,7 +290,11 @@ fn bench_distribution_strategy(c: &mut Criterion) {
 
     let mut schema = DatabaseSchema::new(DatabaseType::PostgreSQL, "bench".to_string());
     let mut table = Table::new("items".to_string());
-    let col = Column::new("price".to_string(), DataType::Numeric, "numeric".to_string());
+    let col = Column::new(
+        "price".to_string(),
+        DataType::Numeric,
+        "numeric".to_string(),
+    );
     table.columns.insert("price".to_string(), col);
     schema.tables.insert("items".to_string(), table);
 

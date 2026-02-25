@@ -89,10 +89,26 @@ fn build_schema(table_count: usize, columns: &[(&str, DataType)]) -> DatabaseSch
     let mut schema = DatabaseSchema::new(DatabaseType::PostgreSQL, "bench".to_string());
 
     let table_prefixes = [
-        "users", "orders", "products", "reviews", "categories",
-        "tags", "comments", "posts", "sessions", "notifications",
-        "invoices", "payments", "addresses", "companies", "departments",
-        "employees", "projects", "tasks", "events", "logs",
+        "users",
+        "orders",
+        "products",
+        "reviews",
+        "categories",
+        "tags",
+        "comments",
+        "posts",
+        "sessions",
+        "notifications",
+        "invoices",
+        "payments",
+        "addresses",
+        "companies",
+        "departments",
+        "employees",
+        "projects",
+        "tasks",
+        "events",
+        "logs",
     ];
 
     for i in 0..table_count {
