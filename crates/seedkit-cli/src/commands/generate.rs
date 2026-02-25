@@ -205,6 +205,22 @@ pub async fn run(args: &GenerateArgs) -> Result<()> {
         .as_ref()
         .map(|c| c.columns.clone())
         .unwrap_or_default();
+
+    // Load distribution profiles if --subset is specified
+    let dist_profiles = if let Some(ref subset_path) = args.subset {
+        let path = std::path::Path::new(subset_path);
+        let profiles = seedkit_core::sample::load_profiles(path)
+            .map_err(|e| anyhow::anyhow!("Failed to load distribution profiles: {}", e))?;
+        eprintln!(
+            "Loaded {} distribution profiles from {}",
+            profiles.len(),
+            subset_path
+        );
+        Some(profiles)
+    } else {
+        None
+    };
+
     let plan = GenerationPlan::build(
         &schema,
         &classifications,
@@ -215,6 +231,7 @@ pub async fn run(args: &GenerateArgs) -> Result<()> {
         seed,
         base_time,
         &column_overrides,
+        dist_profiles.as_deref(),
     );
 
     // Phase 3: Generate data

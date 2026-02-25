@@ -75,6 +75,7 @@ pub async fn run(args: &PreviewArgs) -> Result<()> {
         seed,
         None,
         &std::collections::BTreeMap::new(),
+        None,
     );
 
     let data = engine::execute_plan(&plan, &schema, None)?;

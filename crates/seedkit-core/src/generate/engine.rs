@@ -11,6 +11,7 @@ use crate::generate::plan::*;
 use crate::generate::providers::generate_value;
 use crate::generate::unique::UniqueTracker;
 use crate::generate::value::Value;
+use crate::sample::stats::ColumnDistribution;
 use crate::schema::types::DatabaseSchema;
 
 /// The result of generating data for all tables.
@@ -371,6 +372,9 @@ fn generate_row_candidate(
                     Value::String(Cow::Owned(values[idx].clone()))
                 }
             }
+            GenerationStrategy::Distribution { ref distribution } => {
+                generate_from_distribution(distribution, rng)
+            }
         };
 
         // Single-column unique constraint check with retry
@@ -452,6 +456,60 @@ fn weighted_pick(values: &[String], weights: &[f64], rng: &mut impl Rng) -> Valu
 
     // Floating-point edge case — return last value
     Value::String(Cow::Owned(values.last().unwrap().clone()))
+}
+
+/// Generate a value from a sampled production distribution profile.
+fn generate_from_distribution(distribution: &ColumnDistribution, rng: &mut impl Rng) -> Value {
+    match distribution {
+        ColumnDistribution::Categorical { values } => {
+            if values.is_empty() {
+                return Value::Null;
+            }
+            // Weighted selection from (value, frequency) pairs
+            let total: f64 = values.iter().map(|(_, f)| f.max(0.0)).sum();
+            if total <= 0.0 {
+                let idx = rng.random_range(0..values.len());
+                return Value::String(Cow::Owned(values[idx].0.clone()));
+            }
+            let roll: f64 = rng.random::<f64>() * total;
+            let mut cumulative = 0.0;
+            for (val, freq) in values {
+                cumulative += freq.max(0.0);
+                if roll < cumulative {
+                    return Value::String(Cow::Owned(val.clone()));
+                }
+            }
+            Value::String(Cow::Owned(values.last().unwrap().0.clone()))
+        }
+        ColumnDistribution::Numeric {
+            min,
+            max,
+            mean,
+            stddev,
+        } => {
+            if *stddev <= 0.0 || min == max {
+                // No variance — return the mean (clamped)
+                let val = mean.clamp(*min, *max);
+                return Value::Float(val);
+            }
+            // Box-Muller transform for normal distribution
+            let normal = box_muller_normal(rng);
+            let raw = mean + stddev * normal;
+            let clamped = raw.clamp(*min, *max);
+            Value::Float(clamped)
+        }
+        ColumnDistribution::Ratio { .. } => {
+            // Ratios affect row counts at plan level, not individual values
+            Value::Null
+        }
+    }
+}
+
+/// Box-Muller transform: generate a standard normal random variable.
+fn box_muller_normal(rng: &mut impl Rng) -> f64 {
+    let u1: f64 = rng.random::<f64>().max(f64::MIN_POSITIVE); // avoid log(0)
+    let u2: f64 = rng.random::<f64>();
+    (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos()
 }
 
 #[cfg(test)]
@@ -700,5 +758,155 @@ mod tests {
             "Error should include the path: {}",
             err_msg
         );
+    }
+
+    // --- Distribution strategy tests ---
+
+    #[test]
+    fn test_distribution_strategy_categorical() {
+        let plan = single_column_plan(
+            "items",
+            "status",
+            GenerationStrategy::Distribution {
+                distribution: ColumnDistribution::Categorical {
+                    values: vec![
+                        ("active".to_string(), 0.8),
+                        ("inactive".to_string(), 0.15),
+                        ("suspended".to_string(), 0.05),
+                    ],
+                },
+            },
+            500,
+        );
+        let schema = empty_schema();
+        let data = execute_plan(&plan, &schema, None).unwrap();
+        let rows = &data.tables["items"];
+        assert_eq!(rows.len(), 500);
+
+        // All values should be from the distribution
+        for row in rows {
+            match row.get("status").unwrap() {
+                Value::String(s) => {
+                    assert!(
+                        s == "active" || s == "inactive" || s == "suspended",
+                        "Unexpected value: {}",
+                        s
+                    );
+                }
+                other => panic!("Expected String, got {:?}", other),
+            }
+        }
+
+        // "active" should dominate with 0.8 weight
+        let count_active = rows
+            .iter()
+            .filter(|r| r.get("status") == Some(&Value::String(Cow::Owned("active".into()))))
+            .count();
+        assert!(
+            count_active > 300,
+            "Expected >300 'active' with 0.8 weight, got {}",
+            count_active
+        );
+    }
+
+    #[test]
+    fn test_distribution_strategy_numeric_clamped() {
+        let plan = single_column_plan(
+            "items",
+            "price",
+            GenerationStrategy::Distribution {
+                distribution: ColumnDistribution::Numeric {
+                    min: 0.0,
+                    max: 100.0,
+                    mean: 50.0,
+                    stddev: 15.0,
+                },
+            },
+            1000,
+        );
+        let schema = empty_schema();
+        let data = execute_plan(&plan, &schema, None).unwrap();
+        let rows = &data.tables["items"];
+
+        let mut values: Vec<f64> = Vec::new();
+        for row in rows {
+            match row.get("price").unwrap() {
+                Value::Float(f) => {
+                    assert!(*f >= 0.0, "Value should be >= min (0.0): {}", f);
+                    assert!(*f <= 100.0, "Value should be <= max (100.0): {}", f);
+                    values.push(*f);
+                }
+                other => panic!("Expected Float, got {:?}", other),
+            }
+        }
+
+        // Mean should be roughly 50.0
+        let actual_mean: f64 = values.iter().sum::<f64>() / values.len() as f64;
+        assert!(
+            (actual_mean - 50.0).abs() < 10.0,
+            "Mean should be roughly 50.0, got {}",
+            actual_mean
+        );
+    }
+
+    #[test]
+    fn test_normal_distribution_within_bounds() {
+        let mut rng = StdRng::seed_from_u64(42);
+        // Generate 1000 samples and verify all are within bounds
+        for _ in 0..1000 {
+            let val = generate_from_distribution(
+                &ColumnDistribution::Numeric {
+                    min: 10.0,
+                    max: 20.0,
+                    mean: 15.0,
+                    stddev: 3.0,
+                },
+                &mut rng,
+            );
+            if let Value::Float(f) = val {
+                assert!((10.0..=20.0).contains(&f), "Out of bounds: {}", f);
+            } else {
+                panic!("Expected Float, got {:?}", val);
+            }
+        }
+    }
+
+    #[test]
+    fn test_distribution_zero_stddev_returns_mean() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let val = generate_from_distribution(
+            &ColumnDistribution::Numeric {
+                min: 0.0,
+                max: 100.0,
+                mean: 42.5,
+                stddev: 0.0,
+            },
+            &mut rng,
+        );
+        assert_eq!(val, Value::Float(42.5));
+    }
+
+    #[test]
+    fn test_distribution_empty_categorical_produces_null() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let val = generate_from_distribution(
+            &ColumnDistribution::Categorical { values: vec![] },
+            &mut rng,
+        );
+        assert_eq!(val, Value::Null);
+    }
+
+    #[test]
+    fn test_distribution_ratio_produces_null() {
+        // Ratio distributions affect row counts, not values
+        let mut rng = StdRng::seed_from_u64(42);
+        let val = generate_from_distribution(
+            &ColumnDistribution::Ratio {
+                related_table: "users".to_string(),
+                ratio: 3.2,
+            },
+            &mut rng,
+        );
+        assert_eq!(val, Value::Null);
     }
 }

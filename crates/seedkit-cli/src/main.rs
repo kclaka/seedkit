@@ -32,6 +32,7 @@ async fn main() {
         Command::Preview(args) => commands::preview::run(args).await,
         Command::Check(args) => commands::check::run(args).await,
         Command::Graph(args) => commands::graph::run(args).await,
+        Command::Sample(args) => commands::sample::run(args).await,
     };
 
     if let Err(err) = result {
