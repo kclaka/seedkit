@@ -6,7 +6,7 @@
   <p align="center">
     <a href="https://github.com/kclaka/seedkit/actions/workflows/ci.yml"><img src="https://github.com/kclaka/seedkit/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
     <img src="https://img.shields.io/badge/tests-221_passing-brightgreen" alt="Tests">
-    <img src="https://img.shields.io/badge/version-1.2.0-blue" alt="Version">
+    <img src="https://img.shields.io/badge/version-1.2.1-blue" alt="Version">
     <img src="https://img.shields.io/badge/rust-1.75%2B-orange?logo=rust" alt="Rust">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
     <img src="https://img.shields.io/badge/databases-PostgreSQL%20%7C%20MySQL%20%7C%20SQLite-blueviolet" alt="Databases">
@@ -81,7 +81,7 @@ cargo install --path crates/seedkit-cli
 
 ```bash
 seedkit --version
-# seedkit 1.2.0
+# seedkit 1.2.1
 ```
 
 ### Zero-Config Database Detection
@@ -271,6 +271,21 @@ git checkout --ours seedkit.lock
 seedkit generate --force
 ```
 
+## Performance
+
+Benchmarked with [criterion](https://github.com/bheisler/criterion.rs) on Apple Silicon (M-series). Run `cargo bench` to reproduce.
+
+| Operation | Throughput |
+|---|---|
+| Generation (10 cols, semantic providers) | ~480K rows/sec |
+| Generation (FK references only) | ~3.7M rows/sec |
+| Generation (weighted value lists) | ~6.9M rows/sec |
+| Generation (distribution sampling) | ~8.6M rows/sec |
+| Classification (100 tables x 20 cols) | ~2.1M cols/sec |
+| SQL output formatting | ~1.5M rows/sec |
+| JSON output formatting | ~1.1M rows/sec |
+| CSV output formatting | ~1.5M rows/sec |
+
 ## Comparison
 
 | Feature | SeedKit | Faker/factory_bot | Snaplet |
@@ -314,7 +329,7 @@ cargo test
 docker compose -f docker/docker-compose.test.yml up -d
 TEST_POSTGRES_URL=postgres://seedkit:seedkit@localhost:5432/seedkit_test \
 TEST_MYSQL_URL=mysql://seedkit:seedkit@localhost:3307/seedkit_test \
-  cargo test --test '*'
+  cargo test --test '*' -- --test-threads=1
 ```
 
 ## License
