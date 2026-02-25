@@ -20,7 +20,8 @@ impl MySqlIntrospector {
     }
 
     async fn introspect_tables(&self) -> Result<IndexMap<String, Table>> {
-        let query = "SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE' ORDER BY table_name";
+        // CAST to CHAR for MySQL 8.4+ where information_schema returns VARBINARY
+        let query = "SELECT CAST(table_name AS CHAR) AS table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE' ORDER BY table_name";
         let rows = sqlx::query(query)
             .bind(&self.database_name)
             .fetch_all(&self.pool)
@@ -39,20 +40,21 @@ impl MySqlIntrospector {
     }
 
     async fn introspect_columns(&self, tables: &mut IndexMap<String, Table>) -> Result<()> {
+        // CAST all columns for MySQL 8.4+ where information_schema returns VARBINARY
         let query = r#"
             SELECT
-                table_name,
-                column_name,
-                data_type,
-                column_type,
-                is_nullable,
-                column_default,
-                character_maximum_length,
-                numeric_precision,
-                numeric_scale,
-                ordinal_position,
-                extra,
-                column_key
+                CAST(table_name AS CHAR) AS table_name,
+                CAST(column_name AS CHAR) AS column_name,
+                CAST(data_type AS CHAR) AS data_type,
+                CAST(column_type AS CHAR) AS column_type,
+                CAST(is_nullable AS CHAR) AS is_nullable,
+                CAST(column_default AS CHAR) AS column_default,
+                CAST(character_maximum_length AS SIGNED) AS character_maximum_length,
+                CAST(numeric_precision AS SIGNED) AS numeric_precision,
+                CAST(numeric_scale AS SIGNED) AS numeric_scale,
+                CAST(ordinal_position AS SIGNED) AS ordinal_position,
+                CAST(extra AS CHAR) AS extra,
+                CAST(column_key AS CHAR) AS column_key
             FROM information_schema.columns
             WHERE table_schema = ?
             ORDER BY table_name, ordinal_position
@@ -111,9 +113,9 @@ impl MySqlIntrospector {
     async fn introspect_primary_keys(&self, tables: &mut IndexMap<String, Table>) -> Result<()> {
         let query = r#"
             SELECT
-                tc.table_name,
-                tc.constraint_name,
-                kcu.column_name,
+                CAST(tc.table_name AS CHAR) AS table_name,
+                CAST(tc.constraint_name AS CHAR) AS constraint_name,
+                CAST(kcu.column_name AS CHAR) AS column_name,
                 kcu.ordinal_position
             FROM information_schema.table_constraints tc
             JOIN information_schema.key_column_usage kcu
@@ -158,13 +160,13 @@ impl MySqlIntrospector {
     async fn introspect_foreign_keys(&self, tables: &mut IndexMap<String, Table>) -> Result<()> {
         let query = r#"
             SELECT
-                tc.table_name,
-                tc.constraint_name,
-                kcu.column_name,
-                kcu.referenced_table_name,
-                kcu.referenced_column_name,
-                rc.delete_rule,
-                rc.update_rule
+                CAST(tc.table_name AS CHAR) AS table_name,
+                CAST(tc.constraint_name AS CHAR) AS constraint_name,
+                CAST(kcu.column_name AS CHAR) AS column_name,
+                CAST(kcu.referenced_table_name AS CHAR) AS referenced_table_name,
+                CAST(kcu.referenced_column_name AS CHAR) AS referenced_column_name,
+                CAST(rc.delete_rule AS CHAR) AS delete_rule,
+                CAST(rc.update_rule AS CHAR) AS update_rule
             FROM information_schema.table_constraints tc
             JOIN information_schema.key_column_usage kcu
                 ON tc.constraint_name = kcu.constraint_name
@@ -226,9 +228,9 @@ impl MySqlIntrospector {
     ) -> Result<()> {
         let query = r#"
             SELECT
-                tc.table_name,
-                tc.constraint_name,
-                kcu.column_name,
+                CAST(tc.table_name AS CHAR) AS table_name,
+                CAST(tc.constraint_name AS CHAR) AS constraint_name,
+                CAST(kcu.column_name AS CHAR) AS column_name,
                 kcu.ordinal_position
             FROM information_schema.table_constraints tc
             JOIN information_schema.key_column_usage kcu
