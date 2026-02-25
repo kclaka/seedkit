@@ -1,0 +1,27 @@
+/target
+**/*.rs.bk
+*.pdb
+.env
+.env.*
+!.env.example
+
+# seedkit.lock should be committed (like package-lock.json)
+# Only ignore the temp file used during atomic writes
+.seedkit.lock.tmp
+seedkit.distributions.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/npm/*/seedkit
+/python/seedkit/*.so
+/python/seedkit/*.dylib
+/python/seedkit/*.dll
