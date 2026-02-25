@@ -78,6 +78,7 @@ async fn run_full_pipeline_with_base_time(
         seed,
         base_time,
         &BTreeMap::new(),
+        None,
     );
 
     let data = engine::execute_plan(&plan, &schema, None).expect("execute_plan failed");
@@ -693,6 +694,7 @@ async fn test_pg_table_row_overrides() {
         42,
         None,
         &BTreeMap::new(),
+        None,
     );
 
     // Verify overrides were applied
@@ -760,6 +762,7 @@ async fn test_pg_include_exclude_tables() {
         42,
         None,
         &BTreeMap::new(),
+        None,
     );
 
     let data = engine::execute_plan(&plan, &schema, None).expect("execute_plan failed");

@@ -32,6 +32,9 @@ pub enum Command {
 
     /// Visualize table dependency graph
     Graph(GraphArgs),
+
+    /// Sample production distributions for realistic data generation
+    Sample(SampleArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -92,6 +95,10 @@ pub struct GenerateArgs {
     /// Use PostgreSQL COPY format for output (faster for large datasets)
     #[arg(long)]
     pub copy: bool,
+
+    /// Path to distribution profiles for production-like generation
+    #[arg(long)]
+    pub subset: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -152,6 +159,33 @@ pub struct GraphArgs {
     /// Output format for the dependency graph
     #[arg(long, default_value = "mermaid")]
     pub format: GraphFormat,
+}
+
+#[derive(Parser, Debug)]
+pub struct SampleArgs {
+    /// Database connection URL (read-only replica recommended)
+    #[arg(long, env = "DATABASE_URL")]
+    pub db: Option<String>,
+
+    /// Schema name to introspect
+    #[arg(long)]
+    pub schema: Option<String>,
+
+    /// Output path for distribution profiles
+    #[arg(short, long)]
+    pub output: Option<String>,
+
+    /// Only sample these tables
+    #[arg(long, value_delimiter = ',')]
+    pub tables: Vec<String>,
+
+    /// Maximum distinct values per categorical column
+    #[arg(long, default_value = "50")]
+    pub categorical_limit: usize,
+
+    /// Minimum row count for a table to be sampled
+    #[arg(long, default_value = "10")]
+    pub min_rows: u64,
 }
 
 #[derive(Debug, Clone, ValueEnum)]

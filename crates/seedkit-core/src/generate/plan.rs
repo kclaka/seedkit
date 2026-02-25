@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use crate::classify::semantic::{CorrelationGroup, SemanticType};
 use crate::config::ColumnConfig;
 use crate::graph::topo::DeferredEdge;
+use crate::sample::stats::{ColumnDistribution, DistributionProfile};
 use crate::schema::types::{DatabaseSchema, ParsedCheck};
 
 /// The complete generation plan for all tables.
@@ -83,6 +84,8 @@ pub enum GenerationStrategy {
         values: Vec<String>,
         weights: Option<Vec<f64>>,
     },
+    /// Generate from a sampled production distribution profile.
+    Distribution { distribution: ColumnDistribution },
 }
 
 /// Plan for generating correlated column values.
@@ -109,6 +112,7 @@ impl GenerationPlan {
         seed: u64,
         base_time: Option<chrono::NaiveDateTime>,
         column_overrides: &BTreeMap<String, ColumnConfig>,
+        distribution_profiles: Option<&[DistributionProfile]>,
     ) -> Self {
         let deferred_columns: HashMap<(&str, &str), bool> = deferred_edges
             .iter()
@@ -120,6 +124,39 @@ impl GenerationPlan {
             .map(|k| (k, true))
             .collect();
 
+        // Build a distribution lookup: (table, column) -> ColumnDistribution
+        let dist_lookup: HashMap<(&str, &str), &ColumnDistribution> = distribution_profiles
+            .unwrap_or(&[])
+            .iter()
+            .flat_map(|p| {
+                p.column_distributions
+                    .iter()
+                    .filter(|(_, d)| !matches!(d, ColumnDistribution::Ratio { .. }))
+                    .map(move |(col, dist)| ((p.table_name.as_str(), col.as_str()), dist))
+            })
+            .collect();
+
+        // Build ratio lookup for adjusting row counts
+        let ratio_lookup: HashMap<(&str, &str), f64> = distribution_profiles
+            .unwrap_or(&[])
+            .iter()
+            .flat_map(|p| {
+                p.column_distributions
+                    .iter()
+                    .filter_map(move |(_col, dist)| {
+                        if let ColumnDistribution::Ratio {
+                            related_table,
+                            ratio,
+                        } = dist
+                        {
+                            Some(((p.table_name.as_str(), related_table.as_str()), *ratio))
+                        } else {
+                            None
+                        }
+                    })
+            })
+            .collect();
+
         let mut table_plans = Vec::new();
 
         for table_name in insertion_order {
@@ -128,10 +165,24 @@ impl GenerationPlan {
                 None => continue,
             };
 
-            let row_count = table_row_overrides
-                .get(table_name)
-                .copied()
-                .unwrap_or(default_row_count);
+            // Row count: explicit override > ratio-adjusted > default
+            let row_count = if let Some(&explicit) = table_row_overrides.get(table_name) {
+                explicit
+            } else {
+                // Check if any FK has a ratio profile that adjusts row count
+                let ratio_adjusted = table.foreign_keys.iter().find_map(|fk| {
+                    ratio_lookup
+                        .get(&(table_name.as_str(), fk.referenced_table.as_str()))
+                        .map(|ratio| {
+                            let parent_count = table_row_overrides
+                                .get(&fk.referenced_table)
+                                .copied()
+                                .unwrap_or(default_row_count);
+                            (parent_count as f64 * ratio).round() as usize
+                        })
+                });
+                ratio_adjusted.unwrap_or(default_row_count)
+            };
 
             // Detect correlation groups for this table
             let mut correlation_groups = Vec::new();
@@ -219,6 +270,12 @@ impl GenerationPlan {
                         }
                     } else {
                         GenerationStrategy::SemanticProvider
+                    }
+                } else if let Some(dist) =
+                    dist_lookup.get(&(table_name.as_str(), col_name.as_str()))
+                {
+                    GenerationStrategy::Distribution {
+                        distribution: (*dist).clone(),
                     }
                 } else if let Some(ref values) = column.enum_values {
                     GenerationStrategy::EnumValue {
@@ -541,6 +598,7 @@ mod tests {
             42,
             None,
             &BTreeMap::new(),
+            None,
         );
 
         // Find the user_id column plan in orders
@@ -593,6 +651,7 @@ mod tests {
             42,
             None,
             &BTreeMap::new(),
+            None,
         );
 
         let orders_plan = plan
@@ -654,6 +713,7 @@ mod tests {
             42,
             None,
             &overrides,
+            None,
         );
 
         let col_plan = plan.table_plans[0]
@@ -700,6 +760,7 @@ mod tests {
             42,
             None,
             &overrides,
+            None,
         );
 
         let col_plan = plan.table_plans[0]
@@ -743,6 +804,7 @@ mod tests {
             42,
             None,
             &overrides,
+            None,
         );
 
         // "name" column should use SemanticProvider (no override for it)
@@ -754,6 +816,132 @@ mod tests {
         assert!(
             matches!(col_plan.strategy, GenerationStrategy::SemanticProvider),
             "Nonexistent override should not affect other columns, got {:?}",
+            col_plan.strategy
+        );
+    }
+
+    // --- Distribution profile tests ---
+
+    #[test]
+    fn test_ratio_adjusts_row_counts() {
+        use crate::sample::stats::{ColumnDistribution, DistributionProfile};
+
+        let schema = build_chain_schema();
+        let classifications = HashMap::new();
+        let insertion_order = vec![
+            "users".to_string(),
+            "products".to_string(),
+            "orders".to_string(),
+            "order_items".to_string(),
+        ];
+
+        // Profiles say: orders has 3.2x the rows of users
+        let profiles = vec![
+            DistributionProfile {
+                table_name: "users".to_string(),
+                row_count: 1000,
+                column_distributions: std::collections::HashMap::new(),
+            },
+            DistributionProfile {
+                table_name: "orders".to_string(),
+                row_count: 3200,
+                column_distributions: {
+                    let mut m = std::collections::HashMap::new();
+                    m.insert(
+                        "__ratio_user_id".to_string(),
+                        ColumnDistribution::Ratio {
+                            related_table: "users".to_string(),
+                            ratio: 3.2,
+                        },
+                    );
+                    m
+                },
+            },
+        ];
+
+        let plan = GenerationPlan::build(
+            &schema,
+            &classifications,
+            &insertion_order,
+            Vec::new(),
+            100, // default row count
+            &BTreeMap::new(),
+            42,
+            None,
+            &BTreeMap::new(),
+            Some(&profiles),
+        );
+
+        // users should be 100 (default)
+        let users_plan = plan
+            .table_plans
+            .iter()
+            .find(|t| t.table_name == "users")
+            .unwrap();
+        assert_eq!(users_plan.row_count, 100);
+
+        // orders should be adjusted: 100 * 3.2 = 320
+        let orders_plan = plan
+            .table_plans
+            .iter()
+            .find(|t| t.table_name == "orders")
+            .unwrap();
+        assert_eq!(
+            orders_plan.row_count, 320,
+            "orders should be ratio-adjusted to 320 (100 * 3.2)"
+        );
+    }
+
+    #[test]
+    fn test_distribution_profile_overrides_semantic_provider() {
+        use crate::sample::stats::{ColumnDistribution, DistributionProfile};
+
+        let mut schema = DatabaseSchema::new(DatabaseType::PostgreSQL, "test".to_string());
+        let mut table = Table::new("products".to_string());
+        let col = Column::new(
+            "status".to_string(),
+            DataType::VarChar,
+            "varchar".to_string(),
+        );
+        table.columns.insert("status".to_string(), col);
+        schema.tables.insert("products".to_string(), table);
+
+        let profiles = vec![DistributionProfile {
+            table_name: "products".to_string(),
+            row_count: 500,
+            column_distributions: {
+                let mut m = std::collections::HashMap::new();
+                m.insert(
+                    "status".to_string(),
+                    ColumnDistribution::Categorical {
+                        values: vec![("active".to_string(), 0.9), ("draft".to_string(), 0.1)],
+                    },
+                );
+                m
+            },
+        }];
+
+        let plan = GenerationPlan::build(
+            &schema,
+            &HashMap::new(),
+            &["products".to_string()],
+            Vec::new(),
+            10,
+            &BTreeMap::new(),
+            42,
+            None,
+            &BTreeMap::new(),
+            Some(&profiles),
+        );
+
+        let col_plan = plan.table_plans[0]
+            .column_plans
+            .iter()
+            .find(|c| c.column_name == "status")
+            .unwrap();
+        assert!(
+            matches!(col_plan.strategy, GenerationStrategy::Distribution { .. }),
+            "Expected Distribution strategy from profile, got {:?}",
             col_plan.strategy
         );
     }

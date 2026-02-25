@@ -1,8 +1,25 @@
-# SeedKit
+<p align="center">
+  <h1 align="center">SeedKit</h1>
+  <p align="center">
+    <strong>Generate realistic, constraint-safe seed data for any database.</strong>
+  </p>
+  <p align="center">
+    <a href="https://github.com/kclaka/seedkit/actions/workflows/ci.yml"><img src="https://github.com/kclaka/seedkit/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+    <img src="https://img.shields.io/badge/tests-221_passing-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/version-1.2.0-blue" alt="Version">
+    <img src="https://img.shields.io/badge/rust-1.75%2B-orange?logo=rust" alt="Rust">
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
+    <img src="https://img.shields.io/badge/databases-PostgreSQL%20%7C%20MySQL%20%7C%20SQLite-blueviolet" alt="Databases">
+  </p>
+</p>
 
-**Generate realistic, constraint-safe seed data for any database.**
+---
 
 SeedKit connects to your PostgreSQL, MySQL, or SQLite database, reads the schema, and generates seed data that respects foreign keys, unique constraints, check constraints, and enum types -- all without copying production data.
+
+```bash
+seedkit generate --db postgres://localhost/myapp --rows 1000 --output seed.sql
+```
 
 ## Why SeedKit?
 
@@ -16,29 +33,32 @@ SeedKit fills this gap. One command, realistic data, zero PII.
 
 ## Features
 
-- **Multi-database** -- PostgreSQL, MySQL, and SQLite out of the box
-- **Auto-introspection** -- reads your schema: tables, columns, foreign keys, unique constraints, check constraints, enums
-- **50+ semantic types** -- classifies columns as Email, FirstName, Price, CreatedAt, etc. using pattern matching
-- **FK-safe** -- topological ordering ensures parent rows exist before child rows reference them
-- **Cycle resolution** -- detects circular foreign keys (Tarjan SCC), breaks cycles with deferred updates
-- **Correlated columns** -- city/state/zip stay consistent, `created_at < updated_at`, first+last derive full name
-- **Deterministic** -- lock file (`seedkit.lock`) + seed guarantees identical output across machines
-- **Custom value lists** -- configure weighted distributions via `seedkit.toml`
-- **LLM-enhanced** -- optional `--ai` flag sends schema to Claude/GPT for smarter classification
-- **Multiple outputs** -- SQL (INSERT/COPY), JSON, CSV, or direct database insertion
-- **Schema drift detection** -- `seedkit check` for CI pipelines (exit code 0/1)
-- **Dependency visualization** -- `seedkit graph` exports Mermaid.js or Graphviz DOT
+| Category | Feature |
+|---|---|
+| **Databases** | PostgreSQL, MySQL, and SQLite out of the box |
+| **Introspection** | Auto-reads tables, columns, FKs, unique constraints, check constraints, enums |
+| **Classification** | 50+ semantic types (Email, FirstName, Price, CreatedAt, etc.) via pattern matching |
+| **FK Safety** | Topological ordering ensures parent rows exist before child rows reference them |
+| **Cycle Resolution** | Detects circular FKs (Tarjan SCC), breaks cycles with deferred `UPDATE` statements |
+| **Correlations** | city/state/zip stay consistent, `created_at < updated_at`, first+last derive full name |
+| **Determinism** | Lock file (`seedkit.lock`) + seed guarantees identical output across machines |
+| **Custom Values** | Weighted value lists via `seedkit.toml` config |
+| **Smart Sampling** | Extract production distributions and generate data that mirrors real patterns (with PII masking) |
+| **LLM-Enhanced** | Optional `--ai` flag sends schema to Claude/GPT for smarter classification |
+| **Output Formats** | SQL (`INSERT`/`COPY`), JSON, CSV, or direct database insertion |
+| **CI Integration** | `seedkit check` detects schema drift (exit code 0/1) |
+| **Visualization** | `seedkit graph` exports Mermaid.js or Graphviz DOT dependency diagrams |
 
 ## Quick Start
 
 ```bash
-# Build from source
+# Install from source
 cargo install --path crates/seedkit-cli
 
-# Generate 100 rows per table, output SQL
-seedkit generate --db postgres://localhost/myapp --rows 100 --output seed.sql
+# Generate 1000 rows per table, output SQL
+seedkit generate --db postgres://localhost/myapp --rows 1000 --output seed.sql
 
-# Generate and insert directly into database
+# Insert directly into database
 seedkit generate --db postgres://localhost/myapp --rows 1000
 
 # Use .env or seedkit.toml for connection -- no --db needed
@@ -47,7 +67,7 @@ seedkit generate --rows 500 --output seed.sql
 
 ## Installation
 
-### From Source (Rust)
+### From Source
 
 ```bash
 git clone https://github.com/kclaka/seedkit.git
@@ -55,7 +75,14 @@ cd seedkit
 cargo install --path crates/seedkit-cli
 ```
 
-Requires Rust 1.75+ (2021 edition).
+**Requirements:** Rust 1.75+ (2021 edition)
+
+### Verify Installation
+
+```bash
+seedkit --version
+# seedkit 1.2.0
+```
 
 ### Zero-Config Database Detection
 
@@ -73,20 +100,20 @@ SeedKit automatically finds your database URL by checking (in order):
 Generate seed data for your database.
 
 ```bash
-# Output to SQL file
+# SQL file output
 seedkit generate --db postgres://localhost/myapp --rows 500 --output seed.sql
 
 # Direct insert into database
 seedkit generate --db postgres://localhost/myapp --rows 1000
 
-# JSON or CSV output
-seedkit generate --rows 100 --output data.json --format json
-seedkit generate --rows 100 --output data.csv --format csv
+# JSON or CSV
+seedkit generate --rows 100 --output data.json
+seedkit generate --rows 100 --output data.csv
 
 # PostgreSQL COPY format (10-50x faster bulk loading)
 seedkit generate --rows 10000 --output seed.sql --copy
 
-# Control the random seed for reproducibility
+# Deterministic with seed
 seedkit generate --rows 100 --seed 42 --output seed.sql
 
 # Reproduce from lock file
@@ -95,13 +122,38 @@ seedkit generate --from-lock
 # Per-table row counts
 seedkit generate --rows 100 --table-rows users=500,orders=2000
 
-# Include/exclude specific tables
+# Include/exclude tables
 seedkit generate --include users,orders --rows 100
 seedkit generate --exclude audit_logs,migrations --rows 100
 
 # LLM-enhanced classification
 seedkit generate --rows 100 --ai --output seed.sql
+
+# Production-like with sampled distributions
+seedkit generate --rows 1000 --subset seedkit.distributions.json
 ```
+
+### `seedkit sample`
+
+Extract statistical distributions from a production database (read-only replica recommended). Automatically masks PII columns.
+
+```bash
+# Sample all tables
+seedkit sample --db postgres://readonly-replica:5432/myapp
+
+# Sample specific tables with custom limits
+seedkit sample --db postgres://localhost/myapp --tables users,orders --categorical-limit 100
+
+# Custom output path
+seedkit sample --db postgres://localhost/myapp -o profiles.json
+```
+
+This creates `seedkit.distributions.json` with:
+- **Categorical distributions** -- value frequencies for text/enum columns (PII columns auto-masked)
+- **Numeric distributions** -- min, max, mean, stddev for numeric columns
+- **FK ratios** -- child-to-parent row count ratios (e.g., 3.2 orders per user)
+
+Then use with `seedkit generate --subset seedkit.distributions.json` to produce data that mirrors production patterns.
 
 ### `seedkit introspect`
 
@@ -109,6 +161,7 @@ Analyze your database schema and show classification results.
 
 ```bash
 seedkit introspect --db postgres://localhost/myapp
+seedkit introspect --db postgres://localhost/myapp --format json
 ```
 
 ### `seedkit preview`
@@ -141,7 +194,7 @@ seedkit graph --db postgres://localhost/myapp --format dot | dot -Tpng > schema.
 
 ## Configuration
 
-Create a `seedkit.toml` in your project root for persistent settings:
+Create a `seedkit.toml` in your project root:
 
 ```toml
 [database]
@@ -184,11 +237,13 @@ break_cycle_at = ["users.invited_by_id", "comments.parent_id"]
                           |
           [3] Classify    |  50+ regex rules match column names
                           |  Optional LLM pass (--ai flag)
+                          |  Optional distribution profiles (--subset)
                           v
                   SemanticTypes
                           |
           [4] Generate    |  Row-by-row, FK-safe, unique-safe
                           |  Correlated groups, check constraints
+                          |  Distribution-aware (normal, categorical)
                           v
                   Generated Data
                           |
@@ -226,22 +281,42 @@ seedkit generate --force
 | Circular FK handling | Tarjan SCC + deferral | N/A | Manual |
 | Deterministic | Seed + lock file | Seed only | No |
 | Custom values | TOML config | Code | Code |
+| Smart sampling | Production distributions | No | No |
 | LLM-enhanced | Optional --ai | No | No |
 | CI integration | `seedkit check` | N/A | No |
-| Privacy | No PII (synthetic) | Synthetic | Copies prod |
+| Privacy | Synthetic + PII masking | Synthetic | Copies prod |
 
 ## Architecture
 
 SeedKit is a Rust workspace with three crates:
 
-- **`seedkit-core`** -- all logic: schema introspection, graph algorithms, classification, generation, output
-- **`seedkit-cli`** -- binary with clap-based CLI
-- **`seedkit-testutil`** -- shared test helpers
+```
+seedkit/
+  crates/
+    seedkit-core/     # Library: introspection, graph, classification, generation, output, sampling
+    seedkit-cli/      # Binary: clap-based CLI with 6 subcommands
+    seedkit-testutil/  # Shared test helpers
+  tests/
+    fixtures/         # SQL schema fixtures for integration tests
+```
+
+**Test suite:** 221 tests (201 unit + 13 PostgreSQL integration + 7 MySQL integration)
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and PR guidelines.
 
+```bash
+# Run the full test suite
+cargo test
+
+# Run integration tests (requires Docker)
+docker compose -f docker/docker-compose.test.yml up -d
+TEST_POSTGRES_URL=postgres://seedkit:seedkit@localhost:5432/seedkit_test \
+TEST_MYSQL_URL=mysql://seedkit:seedkit@localhost:3307/seedkit_test \
+  cargo test --test '*'
+```
+
 ## License
 
-Licensed under the MIT License. See [LICENSE](LICENSE) for details.
+Licensed under the [MIT License](LICENSE).

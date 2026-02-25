@@ -1776,7 +1776,7 @@ dependencies = [
 
 [[package]]
 name = "seedkit-cli"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1794,7 +1794,7 @@ dependencies = [
 
 [[package]]
 name = "seedkit-core"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -1823,7 +1823,7 @@ dependencies = [
 
 [[package]]
 name = "seedkit-testutil"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "indexmap",
  "seedkit-core",
