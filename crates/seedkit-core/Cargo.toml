@@ -33,3 +33,16 @@ url.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
 tempfile.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "engine"
+harness = false
+
+[[bench]]
+name = "classify"
+harness = false
+
+[[bench]]
+name = "output"
+harness = false
