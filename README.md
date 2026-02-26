@@ -67,6 +67,27 @@ seedkit generate --rows 500 --output seed.sql
 
 ## Installation
 
+### PyPI (recommended)
+
+```bash
+pip install seedkit
+# or
+pipx install seedkit
+```
+
+### npm
+
+```bash
+npm install -g @seed-kit/cli
+# or run without installing
+npx @seed-kit/cli --help
+```
+
+### GitHub Releases
+
+Download pre-built binaries for Linux (x64/ARM64), macOS (Intel/Apple Silicon), and Windows from
+[Releases](https://github.com/kclaka/seedkit/releases).
+
 ### From Source
 
 ```bash

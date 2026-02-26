@@ -1,0 +1,21 @@
+{
+  "name": "@seed-kit/cli",
+  "version": "1.2.1",
+  "description": "Generate realistic, constraint-safe seed data for any database",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kclaka/seedkit"
+  },
+  "bin": {
+    "seedkit": "bin/seedkit.js"
+  },
+  "keywords": ["database", "seed", "testing", "fake-data", "sql", "cli"],
+  "optionalDependencies": {
+    "@seed-kit/cli-linux-x64": "1.2.1",
+    "@seed-kit/cli-linux-arm64": "1.2.1",
+    "@seed-kit/cli-darwin-x64": "1.2.1",
+    "@seed-kit/cli-darwin-arm64": "1.2.1",
+    "@seed-kit/cli-win32-x64": "1.2.1"
+  }
+}

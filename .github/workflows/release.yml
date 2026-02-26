@@ -1,0 +1,208 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            use-cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            use-cross: true
+          - target: x86_64-apple-darwin
+            os: macos-13
+            use-cross: false
+          - target: aarch64-apple-darwin
+            os: macos-14
+            use-cross: false
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            use-cross: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.use-cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build (cross)
+        if: matrix.use-cross
+        run: cross build --release --target ${{ matrix.target }} --package seedkit-cli
+
+      - name: Build (native)
+        if: ${{ !matrix.use-cross }}
+        run: cargo build --release --target ${{ matrix.target }} --package seedkit-cli
+
+      - name: Prepare artifact (unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p staging
+          cp target/${{ matrix.target }}/release/seedkit staging/
+          cd staging
+          tar czf ../seedkit-${{ matrix.target }}.tar.gz seedkit
+
+      - name: Prepare artifact (windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p staging
+          cp target/${{ matrix.target }}/release/seedkit.exe staging/
+          cd staging
+          7z a ../seedkit-${{ matrix.target }}.zip seedkit.exe
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: seedkit-${{ matrix.target }}
+          path: staging/seedkit*
+          if-no-files-found: error
+
+      - name: Upload archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: archive-${{ matrix.target }}
+          path: seedkit-${{ matrix.target }}.*
+          if-no-files-found: error
+
+  github-release:
+    name: GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: archive-*
+          path: archives
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: archives/*
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ${{ matrix.os }}
+    environment: pypi
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-13
+          - target: aarch64-apple-darwin
+            os: macos-14
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: seedkit-${{ matrix.target }}
+          path: target/release/
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          manylinux: auto
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.target }}
+          path: dist/*.whl
+
+  upload-pypi:
+    name: Upload to PyPI
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: upload
+          args: --non-interactive --skip-existing dist/*
+
+  publish-npm:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: seedkit-*
+          path: artifacts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install latest npm (>=11.5.1 for OIDC)
+        run: npm install -g npm@latest
+
+      - name: Copy binaries into platform packages
+        run: |
+          # Linux x64
+          cp artifacts/seedkit-x86_64-unknown-linux-musl/seedkit \
+            npm/seed-kit-linux-x64/seedkit
+          # Linux ARM64
+          cp artifacts/seedkit-aarch64-unknown-linux-musl/seedkit \
+            npm/seed-kit-linux-arm64/seedkit
+          # macOS Intel
+          cp artifacts/seedkit-x86_64-apple-darwin/seedkit \
+            npm/seed-kit-darwin-x64/seedkit
+          # macOS Apple Silicon
+          cp artifacts/seedkit-aarch64-apple-darwin/seedkit \
+            npm/seed-kit-darwin-arm64/seedkit
+          # Windows
+          cp artifacts/seedkit-x86_64-pc-windows-msvc/seedkit.exe \
+            npm/seed-kit-win32-x64/seedkit.exe
+
+      - name: Publish platform packages
+        run: |
+          for pkg in npm/seed-kit-*/; do
+            npm publish "$pkg" --access public
+          done
+
+      - name: Publish wrapper package
+        run: npm publish npm/seed-kit/ --access public
