@@ -147,8 +147,10 @@ seedkit generate --rows 100 --table-rows users=500,orders=2000
 seedkit generate --include users,orders --rows 100
 seedkit generate --exclude audit_logs,migrations --rows 100
 
-# LLM-enhanced classification
+# LLM-enhanced classification (requires ANTHROPIC_API_KEY or OPENAI_API_KEY)
+export ANTHROPIC_API_KEY=sk-ant-...
 seedkit generate --rows 100 --ai --output seed.sql
+seedkit generate --rows 100 --ai --model claude-opus-4-20250514 --output seed.sql
 
 # Production-like with sampled distributions
 seedkit generate --rows 1000 --subset seedkit.distributions.json

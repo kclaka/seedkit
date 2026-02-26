@@ -6,6 +6,7 @@ build-backend = "maturin"
 name = "seedkit"
 version = "1.5.0"
 description = "Generate realistic, constraint-safe seed data for any database"
+readme = "PYPI_README.md"
 license = { text = "MIT" }
 requires-python = ">=3.8"
 keywords = ["database", "seed", "testing", "fake-data", "sql"]
