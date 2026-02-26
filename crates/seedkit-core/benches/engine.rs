@@ -4,7 +4,7 @@
 //! different table sizes, column counts, and strategy mixes.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use seedkit_core::classify::semantic::SemanticType;
 use seedkit_core::generate::engine::execute_plan;
@@ -15,10 +15,10 @@ use seedkit_core::schema::types::*;
 /// Build a schema with one table containing N semantic columns (no FKs).
 fn single_table_schema(
     num_columns: usize,
-) -> (DatabaseSchema, HashMap<(String, String), SemanticType>) {
+) -> (DatabaseSchema, BTreeMap<(String, String), SemanticType>) {
     let mut schema = DatabaseSchema::new(DatabaseType::PostgreSQL, "bench".to_string());
     let mut table = Table::new("items".to_string());
-    let mut classifications = HashMap::new();
+    let mut classifications = BTreeMap::new();
 
     let types = [
         ("email", DataType::VarChar, SemanticType::Email),
@@ -50,9 +50,9 @@ fn single_table_schema(
 }
 
 /// Build a schema with parent/child FK relationship.
-fn fk_schema() -> (DatabaseSchema, HashMap<(String, String), SemanticType>) {
+fn fk_schema() -> (DatabaseSchema, BTreeMap<(String, String), SemanticType>) {
     let mut schema = DatabaseSchema::new(DatabaseType::PostgreSQL, "bench".to_string());
-    let mut classifications = HashMap::new();
+    let mut classifications = BTreeMap::new();
 
     // Parent: users
     let mut users = Table::new("users".to_string());
