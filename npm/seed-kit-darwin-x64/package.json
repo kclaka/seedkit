@@ -1,6 +1,6 @@
 {
   "name": "@seed-kit/cli-darwin-x64",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "seedkit pre-built binary for macOS Intel",
   "license": "MIT",
   "repository": {

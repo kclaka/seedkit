@@ -3,7 +3,7 @@ members = ["crates/seedkit-core", "crates/seedkit-cli", "crates/seedkit-testutil
 resolver = "2"
 
 [workspace.package]
-version = "1.5.0"
+version = "1.5.1"
 edition = "2021"
 authors = ["Kenny Igbechi"]
 license = "MIT"
