@@ -6,7 +6,7 @@
   <p align="center">
     <a href="https://github.com/kclaka/seedkit/actions/workflows/ci.yml"><img src="https://github.com/kclaka/seedkit/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
     <img src="https://img.shields.io/badge/tests-221_passing-brightgreen" alt="Tests">
-    <img src="https://img.shields.io/badge/version-1.2.1-blue" alt="Version">
+    <img src="https://img.shields.io/badge/version-1.5.0-blue" alt="Version">
     <img src="https://img.shields.io/badge/rust-1.75%2B-orange?logo=rust" alt="Rust">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
     <img src="https://img.shields.io/badge/databases-PostgreSQL%20%7C%20MySQL%20%7C%20SQLite-blueviolet" alt="Databases">
@@ -102,7 +102,7 @@ cargo install --path crates/seedkit-cli
 
 ```bash
 seedkit --version
-# seedkit 1.2.1
+# seedkit 1.5.0
 ```
 
 ### Zero-Config Database Detection

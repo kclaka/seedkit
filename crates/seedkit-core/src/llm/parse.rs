@@ -5,7 +5,7 @@
 //! conservative: LLM overrides only apply to columns that the rule engine
 //! classified as `Unknown`.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
@@ -108,9 +108,9 @@ fn extract_json_array(response: &str) -> &str {
 /// - If the rule engine classified as `Unknown` and the LLM has a
 ///   classification with confidence >= 0.5, use the LLM result.
 pub fn merge_classifications(
-    rule_based: &HashMap<(String, String), SemanticType>,
+    rule_based: &BTreeMap<(String, String), SemanticType>,
     llm_response: &str,
-) -> HashMap<(String, String), SemanticType> {
+) -> BTreeMap<(String, String), SemanticType> {
     let mut merged = rule_based.clone();
 
     let llm_results = match parse_llm_response(llm_response) {
@@ -138,8 +138,8 @@ pub fn merge_classifications(
 /// Filters to only include entries where the LLM changed the classification
 /// (i.e., the rule engine had `Unknown`).
 pub fn build_ai_classification_cache(
-    rule_based: &HashMap<(String, String), SemanticType>,
-    merged: &HashMap<(String, String), SemanticType>,
+    rule_based: &BTreeMap<(String, String), SemanticType>,
+    merged: &BTreeMap<(String, String), SemanticType>,
 ) -> BTreeMap<String, BTreeMap<String, SemanticType>> {
     let mut cache: BTreeMap<String, BTreeMap<String, SemanticType>> = BTreeMap::new();
 
@@ -220,7 +220,7 @@ These are my best guesses."#;
 
     #[test]
     fn test_merge_overrides_unknown_only() {
-        let mut rule_based = HashMap::new();
+        let mut rule_based = BTreeMap::new();
         rule_based.insert(
             ("users".to_string(), "email".to_string()),
             SemanticType::Email,
@@ -261,7 +261,7 @@ These are my best guesses."#;
 
     #[test]
     fn test_merge_with_invalid_llm_response_falls_back() {
-        let mut rule_based = HashMap::new();
+        let mut rule_based = BTreeMap::new();
         rule_based.insert(
             ("users".to_string(), "email".to_string()),
             SemanticType::Email,
@@ -279,7 +279,7 @@ These are my best guesses."#;
 
     #[test]
     fn test_build_ai_classification_cache() {
-        let mut rule_based = HashMap::new();
+        let mut rule_based = BTreeMap::new();
         rule_based.insert(
             ("users".to_string(), "email".to_string()),
             SemanticType::Email,

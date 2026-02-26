@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
@@ -435,11 +435,11 @@ fn extract_mysql_db_name(url: &str) -> Option<String> {
 /// Sends the schema to the configured LLM provider, caches the response,
 /// and merges the results (LLM overrides only for `Unknown` columns).
 async fn enhance_with_llm(
-    rule_classifications: &HashMap<(String, String), SemanticType>,
+    rule_classifications: &BTreeMap<(String, String), SemanticType>,
     schema: &DatabaseSchema,
     model_override: Option<&str>,
 ) -> Result<(
-    HashMap<(String, String), SemanticType>,
+    BTreeMap<(String, String), SemanticType>,
     Option<BTreeMap<String, BTreeMap<String, SemanticType>>>,
 )> {
     let provider = llm::client::LlmProvider::from_env(model_override)
@@ -473,10 +473,10 @@ async fn enhance_with_llm(
 /// Restore AI classifications from a lock file into the classification map.
 #[allow(clippy::type_complexity)]
 fn restore_ai_from_lock(
-    rule_classifications: &HashMap<(String, String), SemanticType>,
+    rule_classifications: &BTreeMap<(String, String), SemanticType>,
     lock_file: &LockFile,
 ) -> (
-    HashMap<(String, String), SemanticType>,
+    BTreeMap<(String, String), SemanticType>,
     Option<BTreeMap<String, BTreeMap<String, SemanticType>>>,
 ) {
     let mut merged = rule_classifications.clone();

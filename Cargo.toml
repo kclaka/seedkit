@@ -3,9 +3,9 @@ members = ["crates/seedkit-core", "crates/seedkit-cli", "crates/seedkit-testutil
 resolver = "2"
 
 [workspace.package]
-version = "1.2.1"
+version = "1.5.0"
 edition = "2021"
-authors = ["SeedKit Contributors"]
+authors = ["Kenny Igbechi"]
 license = "MIT"
 description = "Generate realistic, constraint-safe seed data for any database"
 repository = "https://github.com/kclaka/seedkit"

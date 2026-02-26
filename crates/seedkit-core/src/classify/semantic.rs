@@ -190,7 +190,7 @@ impl fmt::Display for SemanticType {
 }
 
 /// Groups of columns that must be generated together to maintain consistency.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum CorrelationGroup {
     /// Street, city, state, zip, country should be geographically consistent
     Address,

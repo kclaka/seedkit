@@ -104,7 +104,7 @@ impl GenerationPlan {
     #[allow(clippy::too_many_arguments)]
     pub fn build(
         schema: &DatabaseSchema,
-        classifications: &HashMap<(String, String), SemanticType>,
+        classifications: &BTreeMap<(String, String), SemanticType>,
         insertion_order: &[String],
         deferred_edges: Vec<DeferredEdge>,
         default_row_count: usize,
@@ -189,8 +189,8 @@ impl GenerationPlan {
             let mut correlated_columns: HashMap<String, usize> = HashMap::new();
 
             // Group columns by their correlation group
-            let mut group_map: HashMap<CorrelationGroup, Vec<(String, SemanticType)>> =
-                HashMap::new();
+            let mut group_map: BTreeMap<CorrelationGroup, Vec<(String, SemanticType)>> =
+                BTreeMap::new();
             for (col_name, _column) in &table.columns {
                 if let Some(st) = classifications.get(&(table_name.clone(), col_name.clone())) {
                     if let Some(group) = st.correlation_group() {
@@ -584,7 +584,7 @@ mod tests {
             .columns
             .insert("user_id".to_string(), user_id_col);
 
-        let classifications = HashMap::new();
+        let classifications = BTreeMap::new();
         // Only "orders" in the insertion order — "users" excluded
         let insertion_order = vec!["orders".to_string()];
 
@@ -637,7 +637,7 @@ mod tests {
             .columns
             .insert("user_id".to_string(), user_id_col);
 
-        let classifications = HashMap::new();
+        let classifications = BTreeMap::new();
         // Both "users" and "orders" in the insertion order
         let insertion_order = vec!["users".to_string(), "orders".to_string()];
 
@@ -690,7 +690,7 @@ mod tests {
         table.columns.insert("color".to_string(), col);
         schema.tables.insert("products".to_string(), table);
 
-        let classifications = HashMap::new();
+        let classifications = BTreeMap::new();
         let insertion_order = vec!["products".to_string()];
 
         let mut overrides = BTreeMap::new();
@@ -752,7 +752,7 @@ mod tests {
 
         let plan = GenerationPlan::build(
             &schema,
-            &HashMap::new(),
+            &BTreeMap::new(),
             &["orders".to_string()],
             Vec::new(),
             10,
@@ -796,7 +796,7 @@ mod tests {
         // Should not panic — the override simply has no matching column
         let plan = GenerationPlan::build(
             &schema,
-            &HashMap::new(),
+            &BTreeMap::new(),
             &["users".to_string()],
             Vec::new(),
             10,
@@ -827,7 +827,7 @@ mod tests {
         use crate::sample::stats::{ColumnDistribution, DistributionProfile};
 
         let schema = build_chain_schema();
-        let classifications = HashMap::new();
+        let classifications = BTreeMap::new();
         let insertion_order = vec![
             "users".to_string(),
             "products".to_string(),
@@ -923,7 +923,7 @@ mod tests {
 
         let plan = GenerationPlan::build(
             &schema,
-            &HashMap::new(),
+            &BTreeMap::new(),
             &["products".to_string()],
             Vec::new(),
             10,

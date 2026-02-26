@@ -706,8 +706,8 @@ static GENERAL_RULES: &[ClassificationRule] = &[
 /// Classify all columns in a schema and return a map of (table_name, column_name) -> SemanticType.
 pub fn classify_schema(
     schema: &crate::schema::types::DatabaseSchema,
-) -> std::collections::HashMap<(String, String), SemanticType> {
-    let mut result = std::collections::HashMap::new();
+) -> std::collections::BTreeMap<(String, String), SemanticType> {
+    let mut result = std::collections::BTreeMap::new();
 
     for (table_name, table) in &schema.tables {
         let pk_columns: Vec<&str> = table
