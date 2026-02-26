@@ -84,6 +84,21 @@ jobs:
           path: seedkit-${{ matrix.target }}.*
           if-no-files-found: error
 
+      - name: Build Python wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          args: --release --out dist --manifest-path crates/seedkit-cli/Cargo.toml
+          manylinux: auto
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.target }}
+          path: dist/*.whl
+          if-no-files-found: error
+
   github-release:
     name: GitHub Release
     needs: build
@@ -103,48 +118,9 @@ jobs:
           generate_release_notes: true
           files: archives/*
 
-  publish-pypi:
-    name: Publish to PyPI
-    needs: build
-    runs-on: ${{ matrix.os }}
-    environment: pypi
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-latest
-          - target: x86_64-apple-darwin
-            os: macos-13
-          - target: aarch64-apple-darwin
-            os: macos-14
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: seedkit-${{ matrix.target }}
-          path: target/release/
-
-      - uses: PyO3/maturin-action@v1
-        with:
-          command: build
-          target: ${{ matrix.target }}
-          args: --release --out dist
-          manylinux: auto
-
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-${{ matrix.target }}
-          path: dist/*.whl
-
   upload-pypi:
     name: Upload to PyPI
-    needs: publish-pypi
+    needs: build
     runs-on: ubuntu-latest
     environment: pypi
     steps:
@@ -180,33 +156,42 @@ jobs:
       - name: Install latest npm (>=11.5.1 for OIDC)
         run: npm install -g npm@latest
 
-      - name: Copy binaries into platform packages
+      - name: Copy binaries and set permissions
         run: |
           # Linux x64
           cp artifacts/seedkit-x86_64-unknown-linux-musl/seedkit \
             npm/seed-kit-linux-x64/seedkit
+          chmod +x npm/seed-kit-linux-x64/seedkit
+
           # Linux ARM64
           cp artifacts/seedkit-aarch64-unknown-linux-musl/seedkit \
             npm/seed-kit-linux-arm64/seedkit
+          chmod +x npm/seed-kit-linux-arm64/seedkit
+
           # macOS Intel
           cp artifacts/seedkit-x86_64-apple-darwin/seedkit \
             npm/seed-kit-darwin-x64/seedkit
+          chmod +x npm/seed-kit-darwin-x64/seedkit
+
           # macOS Apple Silicon
           cp artifacts/seedkit-aarch64-apple-darwin/seedkit \
             npm/seed-kit-darwin-arm64/seedkit
-          # Windows
+          chmod +x npm/seed-kit-darwin-arm64/seedkit
+
+          # Windows (no chmod needed for .exe)
           cp artifacts/seedkit-x86_64-pc-windows-msvc/seedkit.exe \
             npm/seed-kit-win32-x64/seedkit.exe
 
       - name: Publish platform packages
         run: |
           for pkg in npm/seed-kit-*/; do
-            npm publish "$pkg" --access public
+            echo "Publishing $pkg..."
+            npm publish "$pkg" --access public --provenance
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish wrapper package
-        run: npm publish npm/seed-kit/ --access public
+        run: npm publish npm/seed-kit/ --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
