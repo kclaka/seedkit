@@ -203,6 +203,10 @@ jobs:
           for pkg in npm/seed-kit-*/; do
             npm publish "$pkg" --access public
           done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish wrapper package
         run: npm publish npm/seed-kit/ --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
